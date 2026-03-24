@@ -1,6 +1,5 @@
-import fs from "fs";
-import path from "path";
 import bcrypt from "bcryptjs";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export interface StoredUser {
   id: string;
@@ -9,23 +8,21 @@ export interface StoredUser {
   passwordHash: string;
 }
 
-const DB_PATH = path.join(process.cwd(), "users.json");
+export async function findUserByEmail(email: string): Promise<StoredUser | undefined> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("users")
+    .select("id, email, name, password_hash")
+    .eq("email", email.toLowerCase())
+    .single();
 
-function loadUsers(): StoredUser[] {
-  try {
-    if (!fs.existsSync(DB_PATH)) return [];
-    return JSON.parse(fs.readFileSync(DB_PATH, "utf-8")) as StoredUser[];
-  } catch {
-    return [];
-  }
-}
+  if (error || !data) return undefined;
 
-function saveUsers(users: StoredUser[]): void {
-  fs.writeFileSync(DB_PATH, JSON.stringify(users, null, 2));
-}
-
-export function findUserByEmail(email: string): StoredUser | undefined {
-  return loadUsers().find((u) => u.email.toLowerCase() === email.toLowerCase());
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    passwordHash: data.password_hash,
+  };
 }
 
 export async function createUser(
@@ -33,20 +30,29 @@ export async function createUser(
   email: string,
   password: string
 ): Promise<StoredUser> {
-  const users = loadUsers();
-  if (users.find((u) => u.email.toLowerCase() === email.toLowerCase())) {
-    throw new Error("Email already registered");
-  }
+  const existing = await findUserByEmail(email);
+  if (existing) throw new Error("Email already registered");
+
   const passwordHash = await bcrypt.hash(password, 12);
-  const newUser: StoredUser = {
-    id: crypto.randomUUID(),
-    email: email.toLowerCase(),
-    name,
-    passwordHash,
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("users")
+    .insert({
+      email: email.toLowerCase(),
+      name,
+      password_hash: passwordHash,
+    })
+    .select("id, email, name, password_hash")
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Failed to create user");
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    passwordHash: data.password_hash,
   };
-  users.push(newUser);
-  saveUsers(users);
-  return newUser;
 }
 
 export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
