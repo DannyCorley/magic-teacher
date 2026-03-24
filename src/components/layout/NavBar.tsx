@@ -1,8 +1,11 @@
 import { navItems } from "@/lib/content";
 import MarqueeText from "@/components/ui/MarqueeText";
 import BlinkText from "@/components/ui/BlinkText";
+import AuthButton from "@/components/layout/AuthButton";
+import { auth } from "@/auth";
 
-export default function NavBar() {
+export default async function NavBar() {
+  const session = await auth();
   return (
     <header>
       {/* Title Bar */}
@@ -20,7 +23,8 @@ export default function NavBar() {
         <span className="ml-2 text-xs" style={{ color: "#c0c0c0" }}>
           v2.0 GOLD EDITION
         </span>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex items-center gap-2">
+          <AuthButton session={session} />
           <span className="text-xs px-2 py-0 bg-retro-silver border-win95-raised cursor-pointer">_</span>
           <span className="text-xs px-2 py-0 bg-retro-silver border-win95-raised cursor-pointer">□</span>
           <span className="text-xs px-2 py-0 bg-red-600 text-white border-win95-raised cursor-pointer">X</span>
